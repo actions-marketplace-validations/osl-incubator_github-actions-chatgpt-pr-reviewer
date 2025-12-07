@@ -1,38 +1,70 @@
-# action.yaml
-name: 'GitHub Actions ChatGPT PR Reviewer'
-description: 'A Github Action that uses ChatGPT to review PRs'
+# action.yml (composite)
+name: GitHub Actions ChatGPT PR Reviewer
+description: Review PRs with OpenAI
+branding: { icon: check-circle, color: green }
+
 inputs:
-  openai_api_key:
-    description: 'OpenAI API Key'
-    required: true
-    default: ''
+  openai_api_key: { description: "OpenAI API Key", required: true }
   openai_model:
-    description: 'OpenAI Model'
-    required: false
-    default: 'gpt-3.5-turbo'
+    { description: "OpenAI Model", required: false, default: "gpt-4o-mini" }
   openai_temperature:
-    description: 'Temperature fo randomness, 0 is more conservative and 1 is more creative.'
-    required: false
-    default: '0.5'
+    { description: "Temperature", required: false, default: "0.0" }
   openai_max_tokens:
-    description: 'The maximum number of tokens to generate in the completion.'
+    { description: "Max tokens", required: false, default: "8000" }
+  prompt_project_introduction:
+    { description: "Prompt Project Introduction", required: false, default: "" }
+  prompt_extra_criteria:
+    {
+      description: "Extra criteria (; separated)",
+      required: false,
+      default: "",
+    }
+  github_token: { description: "GitHub token", required: true }
+  github_pr_id: { description: "PR number", required: true }
+  openai_reasoning:
+    description: "Use reasoning mode (on|off|auto). Auto detects by model name."
     required: false
-    default: '2048'
-  github_token:
-    description: 'Github API Key'
-    required: true
-    default: ''
-  github_pr_id:
-    description: 'Github PR ID'
-    required: true
-    default: ''
+    default: "auto"
+  openai_reasoning_effort:
+    description: "Reasoning effort if supported (low|medium|high)."
+    required: false
+    default: "medium"
+  openai_max_completion_tokens:
+    description: |
+      Max completion tokens (reasoning models / Chat API).
+      Also used as max_output_tokens for Responses API.
+    required: false
+    default: "2048"
+  exclude_path:
+    description: "Glob patterns to exclude (comma/; or newline separated)"
+    required: false
+    default: ""
+
 runs:
-  using: 'docker'
-  image: 'Dockerfile'
-  args:
-    - ${{ inputs.openai_api_key }}
-    - ${{ inputs.openai_model }}
-    - ${{ inputs.openai_temperature }}
-    - ${{ inputs.openai_max_tokens }}
-    - ${{ inputs.github_token }}
-    - ${{ inputs.github_pr_id }}
+  using: composite
+  steps:
+    - uses: actions/setup-python@v5
+      with: { python-version: "3.13" }
+
+    - name: Install deps
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r "$GITHUB_ACTION_PATH/requirements.txt"
+
+    - name: Run reviewer
+      shell: bash
+      env:
+        OPENAI_API_KEY: ${{ inputs.openai_api_key }}
+        OPENAI_MODEL: ${{ inputs.openai_model }}
+        OPENAI_TEMPERATURE: ${{ inputs.openai_temperature }}
+        OPENAI_MAX_TOKENS: ${{ inputs.openai_max_tokens }}
+        PROMPT_PROJECT_INTRODUCTION: ${{ inputs.prompt_project_introduction }}
+        PROMPT_EXTRA_CRITERIA: ${{ inputs.prompt_extra_criteria }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        GITHUB_PR_ID: ${{ inputs.github_pr_id }}
+        OPENAI_REASONING: ${{ inputs.openai_reasoning }}
+        OPENAI_REASONING_EFFORT: ${{ inputs.openai_reasoning_effort }}
+        OPENAI_MAX_COMPLETION_TOKENS: ${{ inputs.openai_max_completion_tokens }}
+        EXCLUDE_PATH: ${{ inputs.exclude_path }}
+      run: python "$GITHUB_ACTION_PATH/main.py"
